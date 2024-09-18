@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0",
+    "mysqldump": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.5"
+  },
+  "name": "@leiteszeke/dumperify",
+  "scripts": {
+    "backup": "npx ts-node index.ts"
+  },
+  "version": "1.0.0"
+}
