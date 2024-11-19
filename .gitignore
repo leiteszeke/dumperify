@@ -4,5 +4,7 @@ node_modules
 
 credentials.json
 
+databases.json
+
 backups
 !backups/.gitkeep

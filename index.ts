@@ -1,23 +1,15 @@
-require("dotenv").config();
-
 import { drive_v3, google } from "googleapis";
 import * as fs from "fs";
 import * as path from "path";
 import * as pkey from "./credentials.json";
 import mysqldump from "mysqldump";
 import { format } from "date-fns/format";
-
-// const execAsync = promisify(exec);
+import * as cron from "node-cron";
+import * as Databases from "./databases.json";
 
 // Configuration
 const BACKUP_FOLDER = "./backups";
 const MAX_DUMP_LIMIT = 2;
-const DRIVE_FOLDER_ID = process.env.GDRIVE_FOLDER_ID;
-const DB_HOST = process.env.MYSQL_HOST;
-const DB_USER = process.env.MYSQL_USER;
-const DB_PASS = process.env.MYSQL_PASSWORD;
-const DB_NAME = process.env.MYSQL_DATABASE;
-const DB_PORT = process.env.MYSQL_PORT;
 
 const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
 
@@ -36,7 +28,8 @@ async function authorize() {
 
 const uploadToDrive = async (
   auth: drive_v3.Options["auth"],
-  filePath: string
+  filePath: string,
+  folderId: string
 ) => {
   console.log("Upload dump to Google Drive: Starting", filePath);
 
@@ -49,7 +42,7 @@ const uploadToDrive = async (
     fields: "id",
     requestBody: {
       name: path.basename(filePath),
-      parents: [DRIVE_FOLDER_ID],
+      parents: [folderId],
     },
   });
 
@@ -58,14 +51,17 @@ const uploadToDrive = async (
   console.log("Upload dump to Google Drive: Success", fileId);
 };
 
-async function deleteOldBackups(auth: drive_v3.Options["auth"]) {
+async function deleteOldBackups(
+  auth: drive_v3.Options["auth"],
+  folderId: string
+) {
   console.log("Deleting old backups: Starting");
 
   const drive = google.drive({ version: "v3", auth });
 
   try {
     const response = await drive.files.list({
-      q: `'${DRIVE_FOLDER_ID}' in parents`,
+      q: `'${folderId}' in parents`,
       fields: "files(id, name, mimeType, createdTime)",
       orderBy: "createdTime desc",
     });
@@ -86,24 +82,29 @@ async function deleteOldBackups(auth: drive_v3.Options["auth"]) {
   }
 }
 
-async function createDatabaseDump(): Promise<string> {
-  const timestamp = format(new Date(), "yyyy_MM_dd_HH_mm_ss");
-  const backupFileName = `${DB_NAME}_backup_${timestamp}.sql`;
-  const backupFilePath = path.join(BACKUP_FOLDER, backupFileName);
+async function createDatabaseDump(dbName: string): Promise<string> {
+  const DatabaseConfig = Databases.find((db) => db.name === dbName);
 
-  // const command = `mysqldump -h ${DB_HOST} -P${DB_PORT} -u${DB_USER} -p${DB_PASS} ${DB_NAME} > ${backupFilePath}`;
+  if (!DatabaseConfig) {
+    console.error(`Config for ${dbName} not found`);
+
+    return;
+  }
+
+  const timestamp = format(new Date(), "yyyy_MM_dd_HH_mm_ss");
+  const backupFileName = `${DatabaseConfig.name}_backup_${timestamp}.sql`;
+  const backupFilePath = path.join(BACKUP_FOLDER, backupFileName);
 
   try {
     console.log(`Creating dump in ${backupFilePath}`);
 
-    // await execAsync(command);
     await mysqldump({
       connection: {
-        host: DB_HOST,
-        user: DB_USER,
-        password: DB_PASS,
-        database: DB_NAME,
-        port: Number(DB_PORT),
+        host: DatabaseConfig.host,
+        user: DatabaseConfig.user,
+        password: DatabaseConfig.password,
+        database: DatabaseConfig.database,
+        port: Number(DatabaseConfig.port),
       },
       dumpToFile: backupFilePath,
     });
@@ -119,20 +120,34 @@ async function createDatabaseDump(): Promise<string> {
 }
 
 const main = async (auth: drive_v3.Options["auth"]) => {
-  try {
-    const backupFilePath = await createDatabaseDump();
+  for (const dbConfig of Databases) {
+    console.log(`Creating cron for ${dbConfig.name}`, dbConfig);
 
-    await uploadToDrive(auth, backupFilePath);
+    cron.schedule(
+      dbConfig.cronTime,
+      async () => {
+        try {
+          console.log(`Running cron task for ${dbConfig.name}`, dbConfig);
 
-    await deleteOldBackups(auth);
+          const backupFilePath = await createDatabaseDump(dbConfig.name);
 
-    fs.rmSync(backupFilePath);
+          await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
 
-    console.log(
-      "Backup created and uploaded successfully. Old backups cleaned up. Local file was deleted."
+          await deleteOldBackups(auth, dbConfig.folderId);
+
+          fs.rmSync(backupFilePath);
+
+          console.log(
+            "Backup created and uploaded successfully. Old backups cleaned up. Local file was deleted."
+          );
+        } catch (error) {
+          console.error("Error during backup and upload process:", error);
+        }
+      },
+      {
+        name: `backup-${dbConfig.name}`,
+      }
     );
-  } catch (error) {
-    console.error("Error during backup and upload process:", error);
   }
 };
 

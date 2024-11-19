@@ -3,10 +3,12 @@
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.5",
     "googleapis": "^144.0.0",
-    "mysqldump": "^3.2.0"
+    "mysqldump": "^3.2.0",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
-    "@types/node": "^22.5.5"
+    "@types/node": "^22.5.5",
+    "@types/node-cron": "^3.0.11"
   },
   "name": "@leiteszeke/dumperify",
   "scripts": {

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "my-database",
+    "host": "db.example.com",
+    "user": "root",
+    "password": "root",
+    "database": "default-db",
+    "port": 3306,
+    "folderId": "asedq2312312",
+    "cronTime": "0 0 0 * * *"
+  }
+]
