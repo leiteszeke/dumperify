@@ -12,7 +12,8 @@
   },
   "name": "@leiteszeke/dumperify",
   "scripts": {
-    "backup": "npx ts-node index.ts"
+    "backup": "npx ts-node index.ts",
+    "start": "npx ts-node index.ts"
   },
   "version": "1.0.0"
 }
