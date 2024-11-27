@@ -126,10 +126,12 @@ const main = async (auth: drive_v3.Options["auth"]) => {
     cron.schedule(
       dbConfig.cronTime,
       async () => {
-        try {
-          console.log(`Running cron task for ${dbConfig.name}`, dbConfig);
+        console.log(`Running cron task for ${dbConfig.name}`, dbConfig);
 
-          const backupFilePath = await createDatabaseDump(dbConfig.name);
+        let backupFilePath = "";
+
+        try {
+          backupFilePath = await createDatabaseDump(dbConfig.name);
 
           await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
 
@@ -138,10 +140,16 @@ const main = async (auth: drive_v3.Options["auth"]) => {
           fs.rmSync(backupFilePath);
 
           console.log(
-            "Backup created and uploaded successfully. Old backups cleaned up. Local file was deleted."
+            "Backup created and uploaded successfully. Old backups cleaned up"
           );
         } catch (error) {
           console.error("Error during backup and upload process:", error);
+        } finally {
+          console.log("Deleting local file:");
+
+          fs.rmSync(backupFilePath);
+
+          console.log("Local file deleted");
         }
       },
       {
