@@ -18,7 +18,8 @@ async function authorize() {
     pkey.client_email,
     "",
     pkey.private_key,
-    SCOPES
+    SCOPES,
+    "ezequiel@leites.dev"
   );
 
   await jwtClient.authorize();
