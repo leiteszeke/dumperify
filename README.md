@@ -13,3 +13,7 @@
 - Create Google Drive folder
 - Add service account email as user with permissions in the Google Drive folder
 - Add Folder ID in environment file
+
+## Requirements
+
+- mysqldump

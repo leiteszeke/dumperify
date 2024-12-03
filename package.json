@@ -1,17 +1,19 @@
 {
   "dependencies": {
     "date-fns": "^4.1.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.4.6",
     "googleapis": "^144.0.0",
     "mysqldump": "^3.2.0",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "zlib": "^1.0.5"
   },
   "devDependencies": {
-    "@types/node": "^22.5.5",
+    "@types/node": "^22.10.1",
     "@types/node-cron": "^3.0.11"
   },
   "name": "@leiteszeke/dumperify",
   "scripts": {
+    "dev": "NODE_ENV=local npx ts-node index.ts",
     "backup": "npx ts-node index.ts",
     "start": "npx ts-node index.ts"
   },
