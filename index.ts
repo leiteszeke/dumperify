@@ -141,7 +141,7 @@ const createAndCompressDump = async (dbName: string): Promise<string> => {
   const compressedFilePath = `${backupFilePath}.gz`;
 
   // Comando mysqldump
-  const dumpCommand = `mysqldump --column-statistics=0 -h ${DatabaseConfig.host} --port=${DatabaseConfig.port} -u ${DatabaseConfig.user} -p${DatabaseConfig.password} --lock-tables=false ${DatabaseConfig.database} | gzip > ${compressedFilePath}`;
+  const dumpCommand = `mysqldump --column-statistics=0 -h ${DatabaseConfig.host} --port=${DatabaseConfig.port} -u ${DatabaseConfig.user} -p${DatabaseConfig.password} --single-transaction --lock-tables=false ${DatabaseConfig.database} | gzip > ${compressedFilePath}`;
 
   console.log(`Running mysqldump command`);
 
