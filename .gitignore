@@ -2,7 +2,7 @@
 
 node_modules
 
-credentials.json
+*credentials.json
 
 databases.json
 

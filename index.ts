@@ -1,7 +1,6 @@
 import { drive_v3, google } from "googleapis";
 import * as fs from "fs";
 import * as path from "path";
-import * as pkey from "./credentials.json";
 import mysqldump from "mysqldump";
 import { format } from "date-fns/format";
 import * as cron from "node-cron";
@@ -16,13 +15,28 @@ const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
 
 const IS_LOCAL = process.env.NODE_ENV === "local";
 
-async function authorize() {
+type DbConfig = {
+  credentialsPath?: string;
+  googleEmail?: string;
+  name: string;
+  host: string;
+  user: string;
+  password: string;
+  database: string;
+  port: number;
+  folderId: string;
+  cronTime: string;
+};
+
+async function authorize(dbConfig: DbConfig) {
+  const pkey = require(dbConfig.credentialsPath ?? "./credentials.json");
+
   const jwtClient = new google.auth.JWT(
     pkey.client_email,
     "",
     pkey.private_key,
     SCOPES,
-    "ezequiel@leites.dev"
+    dbConfig.googleEmail ?? "ezequiel@leites.dev"
   );
 
   await jwtClient.authorize();
@@ -165,8 +179,10 @@ const createAndCompressDump = async (dbName: string): Promise<string> => {
   });
 };
 
-const main = async (auth: drive_v3.Options["auth"]) => {
+const main = async () => {
   for (const dbConfig of Databases) {
+    const auth = await authorize(dbConfig);
+
     if (!IS_LOCAL) {
       console.log(`Creating cron for ${dbConfig.name}`, dbConfig);
 
@@ -241,4 +257,4 @@ const main = async (auth: drive_v3.Options["auth"]) => {
   }
 };
 
-authorize().then(main);
+main();
