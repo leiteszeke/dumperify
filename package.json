@@ -1,22 +1,22 @@
 {
   "dependencies": {
     "date-fns": "^4.1.0",
-    "dotenv": "^16.4.6",
-    "googleapis": "^144.0.0",
+    "dotenv": "^16.5.0",
+    "googleapis": "^148.0.0",
     "mysqldump": "^3.2.0",
     "node-cron": "^3.0.3",
     "zlib": "^1.0.5"
   },
   "devDependencies": {
-    "@types/node": "^22.10.1",
+    "@types/node": "^22.15.3",
     "@types/node-cron": "^3.0.11"
   },
   "name": "@leiteszeke/dumperify",
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "scripts": {
-    "dev": "NODE_ENV=local npx ts-node index.ts",
     "backup": "npx ts-node index.ts",
+    "dev": "NODE_ENV=local npx ts-node index.ts",
     "start": "npx ts-node index.ts"
   },
-  "version": "1.0.0",
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "version": "1.1.0"
 }

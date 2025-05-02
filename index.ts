@@ -73,7 +73,8 @@ const uploadToDrive = async (
 
 async function deleteOldBackups(
   auth: drive_v3.Options["auth"],
-  folderId: string
+  folderId: string,
+  fileName: string
 ) {
   console.log("Deleting old backups: Starting");
 
@@ -86,7 +87,9 @@ async function deleteOldBackups(
       orderBy: "createdTime desc",
     });
 
-    const files = response.data.files;
+    const files = response.data.files.filter((f) =>
+      f.name.startsWith(fileName)
+    );
 
     if (files.length > MAX_DUMP_LIMIT) {
       for (let i = MAX_DUMP_LIMIT; i < files.length; i++) {
@@ -200,7 +203,7 @@ const main = async () => {
 
             await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
 
-            await deleteOldBackups(auth, dbConfig.folderId);
+            await deleteOldBackups(auth, dbConfig.folderId, dbConfig.name);
 
             if (process.env.NODE_ENV !== "local") {
               fs.rmSync(backupFilePath);
@@ -235,7 +238,7 @@ const main = async () => {
 
         await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
 
-        await deleteOldBackups(auth, dbConfig.folderId);
+        await deleteOldBackups(auth, dbConfig.folderId, dbConfig.name);
 
         if (process.env.NODE_ENV !== "local") {
           fs.rmSync(backupFilePath);
