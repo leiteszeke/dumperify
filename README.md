@@ -6,6 +6,7 @@
 - Enable Google Drive API [https://console.cloud.google.com/apis/library/drive.googleapis.com](https://console.cloud.google.com/apis/library/drive.googleapis.com)
 - Create a Service Account
 - Create a json key
+- Delegate domain in [admin.google.com](https://admin.google.com/u/1/ac/owl/domainwidedelegation), set Client ID and OAuth permissions [Ex: https://www.googleapis.com/auth/drive.file](https://www.googleapis.com/auth/drive.file)
 
 ## Environment setup
 
