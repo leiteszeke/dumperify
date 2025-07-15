@@ -9,6 +9,7 @@
     "folderId": "asedq2312312",
     "cronTime": "0 0 0 * * *",
     "credentialsPath": "credentials.json",
-    "googleEmail": "your-email@example.com"
+    "googleEmail": "your-email@example.com",
+    "maxDumpLimit": 2
   }
 ]

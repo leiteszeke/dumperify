@@ -26,6 +26,7 @@ type DbConfig = {
   port: number;
   folderId: string;
   cronTime: string;
+  maxDumpLimit?: number;
 };
 
 async function authorize(dbConfig: DbConfig) {
@@ -74,7 +75,8 @@ const uploadToDrive = async (
 async function deleteOldBackups(
   auth: drive_v3.Options["auth"],
   folderId: string,
-  fileName: string
+  fileName: string,
+  maxDumpLimit: number = MAX_DUMP_LIMIT
 ) {
   console.log("Deleting old backups: Starting");
 
@@ -91,8 +93,8 @@ async function deleteOldBackups(
       f.name.startsWith(fileName)
     );
 
-    if (files.length > MAX_DUMP_LIMIT) {
-      for (let i = MAX_DUMP_LIMIT; i < files.length; i++) {
+    if (files.length > maxDumpLimit) {
+      for (let i = maxDumpLimit; i < files.length; i++) {
         await drive.files.delete({ fileId: files[i].id });
 
         console.log(`Deleted old backup: ${files[i].name}`);
@@ -203,7 +205,12 @@ const main = async () => {
 
             await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
 
-            await deleteOldBackups(auth, dbConfig.folderId, dbConfig.name);
+            await deleteOldBackups(
+              auth,
+              dbConfig.folderId,
+              dbConfig.name,
+              dbConfig.maxDumpLimit
+            );
 
             if (process.env.NODE_ENV !== "local") {
               fs.rmSync(backupFilePath);
@@ -238,7 +245,12 @@ const main = async () => {
 
         await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
 
-        await deleteOldBackups(auth, dbConfig.folderId, dbConfig.name);
+        await deleteOldBackups(
+          auth,
+          dbConfig.folderId,
+          dbConfig.name,
+          dbConfig.maxDumpLimit
+        );
 
         if (process.env.NODE_ENV !== "local") {
           fs.rmSync(backupFilePath);
