@@ -5,6 +5,13 @@ node_modules
 *credentials.json
 
 databases.json
+sources.json
 
 backups
 !backups/.gitkeep
+
+logs
+!logs/.gitkeep
+
+jsonl
+!jsonl/.gitkeep

@@ -1,0 +1,11 @@
+[
+  {
+    "apiKey": "api-key",
+    "sourceId": "source-id",
+    "folderId": "folder-id",
+    "cronTime": "cron-time",
+    "credentialsPath": "credentials.json",
+    "googleEmail": "your-email@example.com",
+    "maxDumpLimit": 2
+  }
+]

@@ -6,144 +6,12 @@ import { format } from "date-fns/format";
 import * as cron from "node-cron";
 import * as Databases from "./databases.json";
 import { exec } from "child_process";
+import { authorize, deleteOldBackups, uploadToDrive } from "./drive";
 
 // Configuration
 const BACKUP_FOLDER = "./backups";
-const MAX_DUMP_LIMIT = 2;
-
-const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
 
 const IS_LOCAL = process.env.NODE_ENV === "local";
-
-type DbConfig = {
-  credentialsPath?: string;
-  googleEmail?: string;
-  name: string;
-  host: string;
-  user: string;
-  password: string;
-  database: string;
-  port: number;
-  folderId: string;
-  cronTime: string;
-  maxDumpLimit?: number;
-};
-
-async function authorize(dbConfig: DbConfig) {
-  const pkey = require(dbConfig.credentialsPath ?? "./credentials.json");
-
-  const jwtClient = new google.auth.JWT(
-    pkey.client_email,
-    "",
-    pkey.private_key,
-    SCOPES,
-    dbConfig.googleEmail ?? "ezequiel@leites.dev"
-  );
-
-  await jwtClient.authorize();
-
-  return jwtClient;
-}
-
-const uploadToDrive = async (
-  auth: drive_v3.Options["auth"],
-  filePath: string,
-  folderId: string
-) => {
-  console.log("Upload dump to Google Drive: Starting", filePath);
-
-  const drive = google.drive({ version: "v3", auth });
-
-  const file = await drive.files.create({
-    media: {
-      body: fs.createReadStream(filePath),
-    },
-    fields: "id",
-    requestBody: {
-      name: path.basename(filePath),
-      parents: [folderId],
-    },
-  });
-
-  const fileId = file.data.id;
-
-  console.log("Upload dump to Google Drive: Success", fileId);
-
-  return true;
-};
-
-async function deleteOldBackups(
-  auth: drive_v3.Options["auth"],
-  folderId: string,
-  fileName: string,
-  maxDumpLimit: number = MAX_DUMP_LIMIT
-) {
-  console.log("Deleting old backups: Starting");
-
-  const drive = google.drive({ version: "v3", auth });
-
-  try {
-    const response = await drive.files.list({
-      q: `'${folderId}' in parents`,
-      fields: "files(id, name, mimeType, createdTime)",
-      orderBy: "createdTime desc",
-    });
-
-    const files = response.data.files.filter((f) =>
-      f.name.startsWith(fileName)
-    );
-
-    if (files.length > maxDumpLimit) {
-      for (let i = maxDumpLimit; i < files.length; i++) {
-        await drive.files.delete({ fileId: files[i].id });
-
-        console.log(`Deleted old backup: ${files[i].name}`);
-      }
-    }
-
-    console.log("Deleting old backups: Completed");
-  } catch (error) {
-    console.error("Error deleting old backups:", error);
-  }
-}
-
-async function createDatabaseDump(dbName: string): Promise<string> {
-  const DatabaseConfig = Databases.find((db) => db.name === dbName);
-
-  if (!DatabaseConfig) {
-    console.error(`Config for ${dbName} not found`);
-
-    return;
-  }
-
-  const timestamp = format(new Date(), "yyyy_MM_dd_HH_mm_ss");
-  const backupFileName = `${DatabaseConfig.name}_backup_${timestamp}.sql.gz`;
-  const backupFilePath = path.join(BACKUP_FOLDER, backupFileName);
-
-  try {
-    console.log(`Creating dump in ${backupFilePath}`);
-
-    mysqldump({
-      connection: {
-        host: DatabaseConfig.host,
-        user: DatabaseConfig.user,
-        password: DatabaseConfig.password,
-        database: DatabaseConfig.database,
-        port: Number(DatabaseConfig.port),
-      },
-      dumpToFile: backupFilePath,
-      compressFile: true,
-    });
-
-    console.log(`Database dump created: ${backupFilePath}`);
-
-    return backupFilePath;
-  } catch (error) {
-    console.error("Error creating database dump:", error);
-
-    throw error;
-  }
-}
 
 const createAndCompressDump = async (dbName: string): Promise<string> => {
   const DatabaseConfig = Databases.find((db) => db.name === dbName);
@@ -203,7 +71,7 @@ const main = async () => {
 
             console.log(`File created ${backupFilePath}`);
 
-            await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
+            await uploadToDrive(auth, [backupFilePath], dbConfig.folderId);
 
             await deleteOldBackups(
               auth,
@@ -212,7 +80,7 @@ const main = async () => {
               dbConfig.maxDumpLimit
             );
 
-            if (process.env.NODE_ENV !== "local") {
+            if (!IS_LOCAL) {
               fs.rmSync(backupFilePath);
             }
 
@@ -243,7 +111,7 @@ const main = async () => {
 
         console.log(`File created ${backupFilePath}`);
 
-        await uploadToDrive(auth, backupFilePath, dbConfig.folderId);
+        await uploadToDrive(auth, [backupFilePath], dbConfig.folderId);
 
         await deleteOldBackups(
           auth,
@@ -252,7 +120,7 @@ const main = async () => {
           dbConfig.maxDumpLimit
         );
 
-        if (process.env.NODE_ENV !== "local") {
+        if (!IS_LOCAL) {
           fs.rmSync(backupFilePath);
         }
 

@@ -1,14 +1,17 @@
 {
   "dependencies": {
+    "axios": "^1.10.0",
     "date-fns": "^4.1.0",
-    "dotenv": "^16.5.0",
-    "googleapis": "^148.0.0",
+    "dotenv": "^17.2.0",
+    "googleapis": "^152.0.0",
+    "lodash": "^4.17.21",
     "mysqldump": "^3.2.0",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "zlib": "^1.0.5"
   },
   "devDependencies": {
-    "@types/node": "^22.15.3",
+    "@types/lodash": "^4.17.20",
+    "@types/node": "^24.0.14",
     "@types/node-cron": "^3.0.11"
   },
   "name": "@leiteszeke/dumperify",
@@ -16,7 +19,10 @@
   "scripts": {
     "backup": "npx ts-node index.ts",
     "dev": "NODE_ENV=local npx ts-node index.ts",
-    "start": "npx ts-node index.ts"
+    "dev:log": "NODE_ENV=local npx ts-node logs.ts",
+    "start": "npx ts-node index.ts",
+    "start:log": "npx ts-node logs.ts",
+    "jsonl": "npx ts-node convert-jsonl.ts"
   },
   "version": "1.1.0"
 }
