@@ -13,6 +13,7 @@ import axios from "axios";
 import { authorize, deleteOldBackups, uploadToDrive } from "./drive";
 import * as cron from "node-cron";
 import { LogConfig } from "./types";
+import { convertTxtToJsonL } from "./convert-jsonl";
 
 // Configuration
 const BACKUP_FOLDER = "./logs";
@@ -43,7 +44,7 @@ async function fetchLogsChunk(
   limit: number,
   offset: number
 ): Promise<any[]> {
-  const query = `SELECT json FROM {{source}} WHERE time BETWEEN {{start_time}} AND {{end_time}} ORDER BY {{time}} ASC LIMIT ${limit} OFFSET ${offset} FORMAT JSON`;
+  const query = `SELECT {{time}} as time, JSONExtract(json, 'level', 'Nullable(String)') AS level, JSONExtract(json, 'message', 'Nullable(String)') AS message, json FROM {{source}} WHERE time BETWEEN {{start_time}} AND {{end_time}} ORDER BY {{time}} ASC LIMIT ${limit} OFFSET ${offset} FORMAT JSON`;
 
   const params = new URLSearchParams();
   params.append("source_ids", sourceId);
@@ -81,7 +82,7 @@ const createDump = async (logConfig: LogConfig) => {
     const filename = `./logs/${logConfig.name}-${dayString}-${format(
       fromDate,
       "HH"
-    )}.jsonl`;
+    )}.txt`;
 
     // SALTEA si ya existe
     if (fs.existsSync(filename)) {
@@ -119,8 +120,9 @@ const createDump = async (logConfig: LogConfig) => {
 
         for (const log of chunk) {
           stream.write(
-            `${log.json}\n`
+            `[${log.time}] [${log.level}] ${log.message}\n${log.json}\n\n`
           );
+
           logsThisHour++;
         }
 
@@ -138,16 +140,26 @@ const createDump = async (logConfig: LogConfig) => {
       }
     } while (chunk.length === limit);
 
-    stream.end();
+    stream.end(() => {
+      if (logsThisHour > 0) {
+        console.log(`  → Guardados ${logsThisHour} logs en ${filename}`);
+      } else {
+        if (!IS_LOCAL) {
+          fs.unlinkSync(filename);
+        }
+        console.log("  → Sin logs en este rango horario.");
+      }
 
-    if (logsThisHour > 0) {
-      console.log(`  → Guardados ${logsThisHour} logs en ${filename}`);
-    } else {
-      fs.unlinkSync(filename);
-      console.log("  → Sin logs en este rango horario.");
-    }
+      const finalFileName = `${filename.replace(".txt", ".jsonl")}`;
 
-    files.push(filename);
+      convertTxtToJsonL(filename, finalFileName);
+
+      if (!IS_LOCAL) {
+        fs.unlinkSync(filename);
+      }
+
+      files.push(filename);
+    });
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
