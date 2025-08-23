@@ -1,20 +1,21 @@
-import { drive_v3, google } from "googleapis";
 import * as fs from "fs";
 import * as path from "path";
-import mysqldump from "mysqldump";
 import { format } from "date-fns/format";
 import * as cron from "node-cron";
 import * as Databases from "./databases.json";
 import { exec } from "child_process";
 import { authorize, deleteOldBackups, uploadToDrive } from "./drive";
+import { DbConfig } from "./types";
 
 // Configuration
 const BACKUP_FOLDER = "./backups";
 
 const IS_LOCAL = process.env.NODE_ENV === "local";
 
+const databasesConfig = Databases as DbConfig[];
+
 const createAndCompressDump = async (dbName: string): Promise<string> => {
-  const DatabaseConfig = Databases.find((db) => db.name === dbName);
+  const DatabaseConfig = databasesConfig.find((db) => db.name === dbName);
 
   if (!DatabaseConfig) {
     console.error(`Config for ${dbName} not found`);
@@ -53,7 +54,7 @@ const createAndCompressDump = async (dbName: string): Promise<string> => {
 };
 
 const main = async () => {
-  for (const dbConfig of Databases) {
+  for (const dbConfig of databasesConfig) {
     const auth = await authorize(dbConfig);
 
     if (!IS_LOCAL) {
@@ -73,12 +74,7 @@ const main = async () => {
 
             await uploadToDrive(auth, [backupFilePath], dbConfig.folderId);
 
-            await deleteOldBackups(
-              auth,
-              dbConfig.folderId,
-              dbConfig.name,
-              dbConfig.maxDumpLimit
-            );
+            await deleteOldBackups(auth, dbConfig.folderId, dbConfig.name, 2);
 
             if (!IS_LOCAL) {
               fs.rmSync(backupFilePath);
