@@ -76,21 +76,17 @@ const main = async () => {
 
             await deleteOldBackups(auth, dbConfig.folderId, dbConfig.name, 2);
 
-            if (!IS_LOCAL) {
-              fs.rmSync(backupFilePath);
-            }
-
             console.log(
               "Backup created and uploaded successfully. Old backups cleaned up"
             );
           } catch (error) {
             console.error("Error during backup and upload process:", error);
           } finally {
-            console.log("Deleting local file:");
-
-            fs.rmSync(backupFilePath);
-
-            console.log("Local file deleted");
+            if (backupFilePath && fs.existsSync(backupFilePath)) {
+              console.log("Deleting local file:", backupFilePath);
+              fs.rmSync(backupFilePath);
+              console.log("Local file deleted");
+            }
           }
         },
         {
@@ -116,21 +112,17 @@ const main = async () => {
           dbConfig.maxDumpLimit
         );
 
-        if (!IS_LOCAL) {
-          fs.rmSync(backupFilePath);
-        }
-
         console.log(
           "Backup created and uploaded successfully. Old backups cleaned up"
         );
       } catch (error) {
         console.error("Error during backup and upload process:", error);
       } finally {
-        console.log(`Deleting local file: ${backupFilePath}`);
-
-        fs.rmSync(backupFilePath);
-
-        console.log("Local file deleted");
+        if (backupFilePath && fs.existsSync(backupFilePath)) {
+          console.log(`Deleting local file: ${backupFilePath}`);
+          fs.rmSync(backupFilePath);
+          console.log("Local file deleted");
+        }
       }
     }
   }
