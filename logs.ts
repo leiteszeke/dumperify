@@ -7,7 +7,7 @@ import {
   startOfHour,
   endOfHour,
 } from "date-fns";
-import * as fs from "fs";
+import * as fs from "node:fs";
 import * as LogConfigs from "./sources.json";
 import axios from "axios";
 import { authorize, deleteOldBackups, uploadToDrive } from "./drive";
@@ -42,7 +42,7 @@ async function fetchLogsChunk(
   from: string,
   to: string,
   limit: number,
-  offset: number
+  offset: number,
 ): Promise<any[]> {
   const query = `SELECT {{time}} as time, JSONExtract(json, 'level', 'Nullable(String)') AS level, JSONExtract(json, 'message', 'Nullable(String)') AS message, json FROM {{source}} WHERE time BETWEEN {{start_time}} AND {{end_time}} ORDER BY {{time}} ASC LIMIT ${limit} OFFSET ${offset} FORMAT JSON`;
 
@@ -81,7 +81,7 @@ const createDump = async (logConfig: LogConfig) => {
     const to = format(toDate, "yyyy-MM-dd HH:mm:ss");
     const filename = `./logs/${logConfig.name}-${dayString}-${format(
       fromDate,
-      "HH"
+      "HH",
     )}.txt`;
 
     // SALTEA si ya existe
@@ -102,7 +102,7 @@ const createDump = async (logConfig: LogConfig) => {
     let logsThisHour = 0;
 
     console.log(
-      `Descargando logs de ${dayString} hora ${format(fromDate, "HH")}...`
+      `Descargando logs de ${dayString} hora ${format(fromDate, "HH")}...`,
     );
 
     do {
@@ -113,14 +113,14 @@ const createDump = async (logConfig: LogConfig) => {
           from,
           to,
           limit,
-          offset
+          offset,
         );
 
         if (chunk.length === 0) break;
 
         for (const log of chunk) {
           stream.write(
-            `[${log.time}] [${log.level}] ${log.message}\n${log.json}\n\n`
+            `[${log.time}] [${log.level}] ${log.message}\n${log.json}\n\n`,
           );
 
           logsThisHour++;
@@ -171,7 +171,30 @@ async function main() {
   for (const logConfig of LogConfigs) {
     const auth = await authorize(logConfig);
 
-    if (!IS_LOCAL) {
+    if (IS_LOCAL) {
+      let backupFilePaths: string[] = [];
+
+      try {
+        backupFilePaths = await createDump(logConfig);
+
+        console.log(`Files created \r\n${backupFilePaths.join("\r\n")}`);
+
+        await uploadToDrive(auth, backupFilePaths, logConfig.folderId);
+
+        await deleteOldBackups(
+          auth,
+          logConfig.folderId,
+          logConfig.name,
+          logConfig.maxDumpLimit,
+        );
+
+        console.log(
+          "Backup created and uploaded successfully. Old backups cleaned up",
+        );
+      } catch (error) {
+        console.error("Error during backup and upload process:", error);
+      }
+    } else {
       console.log(`Creating cron for ${logConfig.name}`, logConfig);
 
       cron.schedule(
@@ -192,11 +215,11 @@ async function main() {
               auth,
               logConfig.folderId,
               logConfig.name,
-              logConfig.maxDumpLimit
+              logConfig.maxDumpLimit,
             );
 
             console.log(
-              "Backup created and uploaded successfully. Old backups cleaned up"
+              "Backup created and uploaded successfully. Old backups cleaned up",
             );
           } catch (error) {
             console.error("Error during backup and upload process:", error);
@@ -204,31 +227,8 @@ async function main() {
         },
         {
           name: `backup-logs-${logConfig.name}`,
-        }
+        },
       );
-    } else {
-      let backupFilePaths: string[] = [];
-
-      try {
-        backupFilePaths = await createDump(logConfig);
-
-        console.log(`Files created \r\n${backupFilePaths.join("\r\n")}`);
-
-        await uploadToDrive(auth, backupFilePaths, logConfig.folderId);
-
-        await deleteOldBackups(
-          auth,
-          logConfig.folderId,
-          logConfig.name,
-          logConfig.maxDumpLimit
-        );
-
-        console.log(
-          "Backup created and uploaded successfully. Old backups cleaned up"
-        );
-      } catch (error) {
-        console.error("Error during backup and upload process:", error);
-      }
     }
 
     console.log("¡Listo! Logs descargados por hora.");

@@ -1,11 +1,15 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { format } from "date-fns/format";
 import * as cron from "node-cron";
 import * as Databases from "./databases.json";
-import { exec } from "child_process";
+import { exec, execSync } from "node:child_process";
 import { authorize, deleteOldBackups, uploadToDrive } from "./drive";
+import { sendAlert } from "./notify";
 import { DbConfig } from "./types";
+
+const DUMP_MIN_SIZE_BYTES = 100;
+const DUMP_COMPLETED_MARKER = "-- Dump completed";
 
 // Configuration
 const BACKUP_FOLDER = "./backups";
@@ -20,7 +24,7 @@ const createAndCompressDump = async (dbName: string): Promise<string> => {
   if (!DatabaseConfig) {
     console.error(`Config for ${dbName} not found`);
 
-    return;
+    return "";
   }
 
   const timestamp = format(new Date(), "yyyy_MM_dd_HH_mm_ss");
@@ -44,7 +48,7 @@ const createAndCompressDump = async (dbName: string): Promise<string> => {
 
       console.log(
         "Dump successfully created and compressed at:",
-        compressedFilePath
+        compressedFilePath,
       );
 
       // Devuelve la ruta del archivo comprimido
@@ -53,11 +57,119 @@ const createAndCompressDump = async (dbName: string): Promise<string> => {
   });
 };
 
+const validateDump = (
+  compressedFilePath: string,
+  dbConfig: DbConfig,
+): string | null => {
+  console.log(`Validating dump: ${compressedFilePath}`);
+
+  // 1. Check file size
+  const stats = fs.statSync(compressedFilePath);
+
+  if (stats.size < DUMP_MIN_SIZE_BYTES) {
+    return `File too small (${stats.size} bytes). Dump may be empty or corrupted.`;
+  }
+
+  // 2. Check gzip integrity
+  try {
+    execSync(`gzip -t ${compressedFilePath}`);
+  } catch {
+    return "Gzip integrity check failed. File is corrupted.";
+  }
+
+  // 3. Check mysqldump completion marker
+  try {
+    const tail = execSync(
+      `gzip -dc ${compressedFilePath} | tail -c 500`,
+    ).toString();
+
+    if (!tail.includes(DUMP_COMPLETED_MARKER)) {
+      return "Dump completion marker not found. The dump may have been interrupted.";
+    }
+  } catch {
+    return "Could not read dump contents.";
+  }
+
+  // 4. Check minimum expected tables
+  if (dbConfig.minTables) {
+    try {
+      const countOutput = execSync(
+        `gzip -dc ${compressedFilePath} | grep -c "CREATE TABLE"`,
+      )
+        .toString()
+        .trim();
+
+      const tableCount = Number.parseInt(countOutput, 10);
+
+      if (tableCount < dbConfig.minTables) {
+        return `Found ${tableCount} tables, expected at least ${dbConfig.minTables}. Database may have been compromised.`;
+      }
+
+      console.log(
+        `Found ${tableCount} tables (minimum: ${dbConfig.minTables})`,
+      );
+    } catch {
+      return "Could not count tables in dump.";
+    }
+  }
+
+  console.log("Dump validation passed");
+  return null;
+};
+
 const main = async () => {
   for (const dbConfig of databasesConfig) {
     const auth = await authorize(dbConfig);
 
-    if (!IS_LOCAL) {
+    if (IS_LOCAL) {
+      console.log(`Running dump for ${dbConfig.name}`, dbConfig);
+
+      let backupFilePath = "";
+
+      try {
+        backupFilePath = await createAndCompressDump(dbConfig.name);
+
+        console.log(`File created ${backupFilePath}`);
+
+        const validationError = validateDump(backupFilePath, dbConfig);
+
+        if (validationError) {
+          console.error(
+            `Dump validation failed for ${dbConfig.name}: ${validationError}`,
+          );
+          await sendAlert(
+            `Validation failed: ${dbConfig.name}`,
+            `Database: ${dbConfig.name}\nHost: ${dbConfig.host}\nError: ${validationError}\n\nThe dump was NOT uploaded. Old backups were preserved.`,
+          );
+          continue;
+        }
+
+        await uploadToDrive(auth, [backupFilePath], dbConfig.folderId);
+
+        await deleteOldBackups(
+          auth,
+          dbConfig.folderId,
+          dbConfig.name,
+          dbConfig.maxDumpLimit,
+        );
+
+        console.log(
+          "Backup created and uploaded successfully. Old backups cleaned up",
+        );
+      } catch (error) {
+        console.error("Error during backup and upload process:", error);
+        await sendAlert(
+          `Backup error: ${dbConfig.name}`,
+          `Database: ${dbConfig.name}\nHost: ${dbConfig.host}\nError: ${error}`,
+        );
+      } finally {
+        if (backupFilePath && fs.existsSync(backupFilePath)) {
+          console.log(`Deleting local file: ${backupFilePath}`);
+          fs.rmSync(backupFilePath);
+          console.log("Local file deleted");
+        }
+      }
+    } else {
       console.log(`Creating cron for ${dbConfig.name}`, dbConfig);
 
       cron.schedule(
@@ -72,15 +184,37 @@ const main = async () => {
 
             console.log(`File created ${backupFilePath}`);
 
+            const validationError = validateDump(backupFilePath, dbConfig);
+
+            if (validationError) {
+              console.error(
+                `Dump validation failed for ${dbConfig.name}: ${validationError}`,
+              );
+              await sendAlert(
+                `Validation failed: ${dbConfig.name}`,
+                `Database: ${dbConfig.name}\nHost: ${dbConfig.host}\nError: ${validationError}\n\nThe dump was NOT uploaded. Old backups were preserved.`,
+              );
+              return;
+            }
+
             await uploadToDrive(auth, [backupFilePath], dbConfig.folderId);
 
-            await deleteOldBackups(auth, dbConfig.folderId, dbConfig.name, 2);
+            await deleteOldBackups(
+              auth,
+              dbConfig.folderId,
+              dbConfig.name,
+              dbConfig.maxDumpLimit,
+            );
 
             console.log(
-              "Backup created and uploaded successfully. Old backups cleaned up"
+              "Backup created and uploaded successfully. Old backups cleaned up",
             );
           } catch (error) {
             console.error("Error during backup and upload process:", error);
+            await sendAlert(
+              `Backup error: ${dbConfig.name}`,
+              `Database: ${dbConfig.name}\nHost: ${dbConfig.host}\nError: ${error}`,
+            );
           } finally {
             if (backupFilePath && fs.existsSync(backupFilePath)) {
               console.log("Deleting local file:", backupFilePath);
@@ -91,39 +225,8 @@ const main = async () => {
         },
         {
           name: `backup-${dbConfig.name}`,
-        }
+        },
       );
-    } else {
-      console.log(`Running dump for ${dbConfig.name}`, dbConfig);
-
-      let backupFilePath = "";
-
-      try {
-        backupFilePath = await createAndCompressDump(dbConfig.name);
-
-        console.log(`File created ${backupFilePath}`);
-
-        await uploadToDrive(auth, [backupFilePath], dbConfig.folderId);
-
-        await deleteOldBackups(
-          auth,
-          dbConfig.folderId,
-          dbConfig.name,
-          dbConfig.maxDumpLimit
-        );
-
-        console.log(
-          "Backup created and uploaded successfully. Old backups cleaned up"
-        );
-      } catch (error) {
-        console.error("Error during backup and upload process:", error);
-      } finally {
-        if (backupFilePath && fs.existsSync(backupFilePath)) {
-          console.log(`Deleting local file: ${backupFilePath}`);
-          fs.rmSync(backupFilePath);
-          console.log("Local file deleted");
-        }
-      }
     }
   }
 };

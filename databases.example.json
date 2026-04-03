@@ -10,6 +10,7 @@
     "cronTime": "0 0 0 * * *",
     "credentialsPath": "credentials.json",
     "googleEmail": "your-email@example.com",
-    "maxDumpLimit": 2
+    "maxDumpLimit": 2,
+    "minTables": 10
   }
 ]

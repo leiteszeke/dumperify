@@ -1,0 +1,11 @@
+{
+  "smtp": {
+    "host": "smtp.sendgrid.net",
+    "port": 587,
+    "secure": false,
+    "user": "apikey",
+    "password": "SG.your-sendgrid-api-key"
+  },
+  "from": "Dumperify <noreply@yourdomain.com>",
+  "to": ["alerts@example.com"]
+}

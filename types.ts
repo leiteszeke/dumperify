@@ -23,4 +23,5 @@ export type DbConfig = GoogleConfig &
     password: string;
     database: string;
     port: number;
+    minTables?: number;
   };

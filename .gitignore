@@ -6,6 +6,7 @@ node_modules
 
 databases.json
 sources.json
+notify.json
 
 backups
 !backups/.gitkeep
@@ -15,3 +16,5 @@ logs
 
 jsonl
 !jsonl/.gitkeep
+
+.claude
