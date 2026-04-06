@@ -14,6 +14,7 @@ import { authorize, deleteOldBackups, uploadToDrive } from "./drive";
 import * as cron from "node-cron";
 import { LogConfig } from "./types";
 import { convertTxtToJsonL } from "./convert-jsonl";
+import { sendAlert } from "./notify";
 
 // Configuration
 const BACKUP_FOLDER = "./logs";
@@ -129,11 +130,16 @@ const createDump = async (logConfig: LogConfig) => {
         fetched += chunk.length;
         offset += limit;
       } catch (err: any) {
-        if (err.response) {
-          console.error("Error response:", err.response.data);
-        } else {
-          console.error("Error:", err.message);
-        }
+        const errorDetail = err.response
+          ? JSON.stringify(err.response.data)
+          : err.message;
+
+        console.error("Error fetching logs:", errorDetail);
+
+        await sendAlert(
+          `Log fetch error: ${logConfig.name}`,
+          `Source: ${logConfig.name}\nHour: ${format(fromDate, "HH")}\nError: ${errorDetail}`,
+        );
 
         stream.end();
         process.exit(1);
@@ -193,6 +199,10 @@ async function main() {
         );
       } catch (error) {
         console.error("Error during backup and upload process:", error);
+        await sendAlert(
+          `Log backup error: ${logConfig.name}`,
+          `Source: ${logConfig.name}\nError: ${error}`,
+        );
       }
     } else {
       console.log(`Creating cron for ${logConfig.name}`, logConfig);
@@ -223,6 +233,10 @@ async function main() {
             );
           } catch (error) {
             console.error("Error during backup and upload process:", error);
+            await sendAlert(
+              `Log backup error: ${logConfig.name}`,
+              `Source: ${logConfig.name}\nError: ${error}`,
+            );
           }
         },
         {
