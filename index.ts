@@ -134,10 +134,14 @@ const preflightCheck = async (
     console.log(`[${dbConfig.name}] ✓ Database connection OK`);
   } catch {
     console.error(`[${dbConfig.name}] ✗ Database connection FAILED`);
-    await sendAlert(
-      `Preflight failed: ${dbConfig.name}`,
-      `Database: ${dbConfig.name}\nHost: ${dbConfig.host}\nError: Could not connect to database`,
-    );
+    try {
+      await sendAlert(
+        `Preflight failed: ${dbConfig.name}`,
+        `Database: ${dbConfig.name}\nHost: ${dbConfig.host}\nError: Could not connect to database`,
+      );
+    } catch (e) {
+      console.error(`[${dbConfig.name}] Could not send alert:`, e);
+    }
     ok = false;
   }
 
@@ -152,10 +156,14 @@ const preflightCheck = async (
     console.log(`[${dbConfig.name}] ✓ Drive folder access OK`);
   } catch {
     console.error(`[${dbConfig.name}] ✗ Drive folder access FAILED`);
-    await sendAlert(
-      `Preflight failed: ${dbConfig.name}`,
-      `Database: ${dbConfig.name}\nFolder ID: ${dbConfig.folderId}\nError: Could not access Google Drive folder`,
-    );
+    try {
+      await sendAlert(
+        `Preflight failed: ${dbConfig.name}`,
+        `Database: ${dbConfig.name}\nFolder ID: ${dbConfig.folderId}\nError: Could not access Google Drive folder`,
+      );
+    } catch (e) {
+      console.error(`[${dbConfig.name}] Could not send alert:`, e);
+    }
     ok = false;
   }
 
