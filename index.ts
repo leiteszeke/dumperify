@@ -7,6 +7,7 @@ import { exec, execSync } from "node:child_process";
 import { authorize, deleteOldBackups, uploadToDrive } from "./drive";
 import { sendAlert } from "./notify";
 import { DbConfig } from "./types";
+import { drive_v3, google } from "googleapis";
 
 const DUMP_MIN_SIZE_BYTES = 100;
 const DUMP_COMPLETED_MARKER = "-- Dump completed";
@@ -118,6 +119,49 @@ const validateDump = (
   return null;
 };
 
+const preflightCheck = async (
+  dbConfig: DbConfig,
+  auth: drive_v3.Options["auth"],
+): Promise<boolean> => {
+  let ok = true;
+
+  // 1. Check DB connection
+  try {
+    execSync(
+      `mysqladmin ping -h ${dbConfig.host} --port=${dbConfig.port} -u ${dbConfig.user} -p'${dbConfig.password.replace(/'/g, "'\\''")}'`,
+      { timeout: 10000 },
+    );
+    console.log(`[${dbConfig.name}] ✓ Database connection OK`);
+  } catch {
+    console.error(`[${dbConfig.name}] ✗ Database connection FAILED`);
+    await sendAlert(
+      `Preflight failed: ${dbConfig.name}`,
+      `Database: ${dbConfig.name}\nHost: ${dbConfig.host}\nError: Could not connect to database`,
+    );
+    ok = false;
+  }
+
+  // 2. Check Drive folder access
+  try {
+    const drive = google.drive({ version: "v3", auth });
+    await drive.files.list({
+      q: `'${dbConfig.folderId}' in parents`,
+      fields: "files(id)",
+      pageSize: 1,
+    });
+    console.log(`[${dbConfig.name}] ✓ Drive folder access OK`);
+  } catch {
+    console.error(`[${dbConfig.name}] ✗ Drive folder access FAILED`);
+    await sendAlert(
+      `Preflight failed: ${dbConfig.name}`,
+      `Database: ${dbConfig.name}\nFolder ID: ${dbConfig.folderId}\nError: Could not access Google Drive folder`,
+    );
+    ok = false;
+  }
+
+  return ok;
+};
+
 const main = async () => {
   for (const dbConfig of databasesConfig) {
     const auth = await authorize(dbConfig);
@@ -172,6 +216,13 @@ const main = async () => {
       }
     } else {
       console.log(`Creating cron for ${dbConfig.name}`, dbConfig);
+
+      const preflightOk = await preflightCheck(dbConfig, auth);
+
+      if (!preflightOk) {
+        console.error(`Skipping cron for ${dbConfig.name} due to preflight failure`);
+        continue;
+      }
 
       cron.schedule(
         dbConfig.cronTime,
