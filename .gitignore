@@ -6,7 +6,7 @@ node_modules
 
 databases.json
 sources.json
-notify.json
+notify-config.json
 
 backups
 !backups/.gitkeep

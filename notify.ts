@@ -19,12 +19,12 @@ const loadConfig = (): NotifyConfig | null => {
   if (config) return config;
 
   try {
-    const raw = fs.readFileSync("./notify.json", "utf-8");
+    const raw = fs.readFileSync("./notify-config.json", "utf-8");
     config = JSON.parse(raw) as NotifyConfig;
     return config;
   } catch {
     console.warn(
-      "Notification config (notify.json) not found. Notifications disabled.",
+      "Notification config (notify-config.json) not found. Notifications disabled.",
     );
     return null;
   }

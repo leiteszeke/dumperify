@@ -34,7 +34,10 @@ const createAndCompressDump = async (dbName: string): Promise<string> => {
   const compressedFilePath = `${backupFilePath}.gz`;
 
   // Comando mysqldump
-  const escapedPassword = DatabaseConfig.password.replace(/'/g, "'\\''");
+  const escapedPassword = DatabaseConfig.password.replaceAll(
+    "'",
+    String.raw`'\''`,
+  );
   const dumpCommand = `mysqldump --column-statistics=0 -h ${DatabaseConfig.host} --port=${DatabaseConfig.port} -u ${DatabaseConfig.user} -p'${escapedPassword}' --single-transaction --lock-tables=false ${DatabaseConfig.database} | gzip > ${compressedFilePath}`;
 
   console.log(`Running mysqldump command`);
@@ -128,7 +131,7 @@ const preflightCheck = async (
   // 1. Check DB connection
   try {
     execSync(
-      `mysql -h ${dbConfig.host} --port=${dbConfig.port} -u ${dbConfig.user} -p'${dbConfig.password.replace(/'/g, "'\\''")}' -e "SELECT 1" ${dbConfig.database}`,
+      `mysql -h ${dbConfig.host} --port=${dbConfig.port} -u ${dbConfig.user} -p'${dbConfig.password.replaceAll("'", String.raw`'\''`)}' -e "SELECT 1" ${dbConfig.database}`,
       { timeout: 10000, stdio: "pipe" },
     );
     console.log(`[${dbConfig.name}] ✓ Database connection OK`);
@@ -228,7 +231,9 @@ const main = async () => {
       const preflightOk = await preflightCheck(dbConfig, auth);
 
       if (!preflightOk) {
-        console.error(`Skipping cron for ${dbConfig.name} due to preflight failure`);
+        console.error(
+          `Skipping cron for ${dbConfig.name} due to preflight failure`,
+        );
         continue;
       }
 
