@@ -128,8 +128,8 @@ const preflightCheck = async (
   // 1. Check DB connection
   try {
     execSync(
-      `mysqladmin ping -h ${dbConfig.host} --port=${dbConfig.port} -u ${dbConfig.user} -p'${dbConfig.password.replace(/'/g, "'\\''")}'`,
-      { timeout: 10000 },
+      `mysql -h ${dbConfig.host} --port=${dbConfig.port} -u ${dbConfig.user} -p'${dbConfig.password.replace(/'/g, "'\\''")}' -e "SELECT 1" ${dbConfig.database}`,
+      { timeout: 10000, stdio: "pipe" },
     );
     console.log(`[${dbConfig.name}] ✓ Database connection OK`);
   } catch {
